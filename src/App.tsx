@@ -4,19 +4,44 @@ import {Card} from "@/components/ui/card";
 import {Button} from "@/components/ui/button";
 import clsx from "clsx";
 
-function parseReportData(match, differ, missingSrc, missingDst) {
-    const srcTree = {};
-    const dstTree = {};
+// Types
+type Status = "match" | "differ" | "missingSrc" | "missingDst";
 
-    const markTree = (tree, list, status) => {
+type TreeNodeData = {
+    __children: Record<string, TreeNodeData>;
+    __status: Status;
+};
+
+type TreesResult = {
+    srcTree: Record<string, TreeNodeData>;
+    dstTree: Record<string, TreeNodeData>;
+    counts: { match: number; differ: number; missingSrc: number; missingDst: number };
+};
+
+type InputKey = "match" | "differ" | "missingSrc" | "missingDst" | "combined";
+
+function parseReportData(
+    match: string[],
+    differ: string[],
+    missingSrc: string[],
+    missingDst: string[]
+): TreesResult {
+    const srcTree: Record<string, TreeNodeData> = {};
+    const dstTree: Record<string, TreeNodeData> = {};
+
+    const markTree = (
+        tree: Record<string, TreeNodeData>,
+        list: string[],
+        status: Status
+    ) => {
         for (const file of list) {
             const parts = file.split("/");
-            let node = tree;
+            let nodeRef = tree;
             for (let i = 0; i < parts.length; i++) {
-                const part = parts[i];
-                if (!node[part]) node[part] = {__children: {}, __status: "match"};
-                if (i === parts.length - 1) node[part].__status = status;
-                node = node[part].__children;
+                const part = parts[i]!;
+                if (!nodeRef[part]) nodeRef[part] = {__children: {}, __status: "match"};
+                if (i === parts.length - 1) nodeRef[part].__status = status;
+                nodeRef = nodeRef[part].__children;
             }
         }
     };
@@ -29,7 +54,7 @@ function parseReportData(match, differ, missingSrc, missingDst) {
     markTree(dstTree, missingSrc, "missingSrc");
     markTree(dstTree, differ, "differ");
 
-    const propagateStatus = (node) => {
+    const propagateStatus = (node: TreeNodeData): Status => {
         const children = Object.values(node.__children);
         if (children.length === 0) return node.__status;
 
@@ -46,9 +71,9 @@ function parseReportData(match, differ, missingSrc, missingDst) {
         return node.__status;
     };
 
-    const applyPropagate = (tree) => {
+    const applyPropagate = (tree: Record<string, TreeNodeData>) => {
         for (const key in tree) {
-            propagateStatus(tree[key]);
+            propagateStatus(tree[key]!);
         }
     };
 
@@ -56,46 +81,51 @@ function parseReportData(match, differ, missingSrc, missingDst) {
     applyPropagate(dstTree);
 
     return {
-        srcTree, dstTree, counts: {
+        srcTree,
+        dstTree,
+        counts: {
             match: match.length,
             differ: differ.length,
             missingSrc: missingSrc.length,
-            missingDst: missingDst.length
-        }
+            missingDst: missingDst.length,
+        },
     };
 }
 
-function parseCombinedReport(combinedText) {
-    const match = [];
-    const differ = [];
-    const missingSrc = [];
-    const missingDst = [];
-    const lines = combinedText.split("\n").map((l) => l.trim()).filter(Boolean);
+function parseCombinedReport(combinedText: string): TreesResult {
+    const match: string[] = [];
+    const differ: string[] = [];
+    const missingSrc: string[] = [];
+    const missingDst: string[] = [];
+    const lines = combinedText
+        .split("\n")
+        .map((l: string) => l.trim())
+        .filter(Boolean);
 
     for (const line of lines) {
         const symbol = line[0];
         const path = line.slice(2);
-        if (symbol === '=') match.push(path);
-        else if (symbol === '-') missingSrc.push(path);
-        else if (symbol === '+') missingDst.push(path);
-        else if (symbol === '*') differ.push(path);
+        if (symbol === "=") match.push(path);
+        else if (symbol === "-") missingSrc.push(path);
+        else if (symbol === "+") missingDst.push(path);
+        else if (symbol === "*") differ.push(path);
     }
 
     return parseReportData(match, differ, missingSrc, missingDst);
 }
 
-function TreeNode({name, data, hideMatches}) {
+function TreeNode({name, data, hideMatches}: { name: string; data: TreeNodeData; hideMatches: boolean }) {
     const [open, setOpen] = useState(false);
     const isFile = Object.keys(data.__children).length === 0;
 
-    const colorMap = {
+    const colorMap: Record<Status, string> = {
         match: "text-gray-500",
         differ: "text-orange-500",
         missingSrc: "text-blue-600",
         missingDst: "text-blue-600",
     };
 
-    const status = data.__status || "match";
+    const status: Status = data.__status || "match";
     const colorClass = colorMap[status] || "text-black";
 
     if (hideMatches && status === "match") return null;
@@ -121,8 +151,14 @@ function TreeNode({name, data, hideMatches}) {
 }
 
 export default function App() {
-    const [trees, setTrees] = useState(null);
-    const [inputs, setInputs] = useState({
+    const [trees, setTrees] = useState<TreesResult | null>(null);
+    const [inputs, setInputs] = useState<{
+        match: string;
+        differ: string;
+        missingSrc: string;
+        missingDst: string;
+        combined: string;
+    }>({
         match: "",
         differ: "",
         missingSrc: "",
@@ -132,14 +168,14 @@ export default function App() {
     const [hideMatches, setHideMatches] = useState(false);
     const [useCombined, setUseCombined] = useState(false);
 
-    const handleChange = (key, value) => {
+    const handleChange = (key: InputKey, value: string) => {
         setInputs((prev) => ({...prev, [key]: value}));
     };
 
-    const handleFileUpload = (key, file) => {
+    const handleFileUpload = (key: InputKey, file: File) => {
         const reader = new FileReader();
-        reader.onload = (e) => {
-            const text = e.target.result;
+        reader.onload = (e: ProgressEvent<FileReader>) => {
+            const text = e.target?.result;
             if (typeof text === "string") {
                 handleChange(key, text);
             }
@@ -152,8 +188,8 @@ export default function App() {
             const result = parseCombinedReport(inputs.combined);
             setTrees(result);
         } else {
-            const parseLines = (text) =>
-                text.split("\n").map((l) => l.trim()).filter(Boolean);
+            const parseLines = (text: string) =>
+                text.split("\n").map((l: string) => l.trim()).filter(Boolean);
             const result = parseReportData(
                 parseLines(inputs.match),
                 parseLines(inputs.differ),
@@ -191,13 +227,13 @@ export default function App() {
                             type="file"
                             accept=".txt"
                             onChange={(e) =>
-                                e.target.files && handleFileUpload("combined", e.target.files[0])
+                                e.target.files && handleFileUpload("combined", e.target.files[0]!)
                             }
                         />
                     </div>
                 ) : (
                     <div className="grid grid-cols-2 gap-4">
-                        {["match", "differ", "missingSrc", "missingDst"].map((key) => (
+                        {(["match", "differ", "missingSrc", "missingDst"] as const).map((key) => (
                             <div key={key}>
                                 <label className="capitalize text-sm block mb-1">{key}:</label>
                                 <textarea
@@ -210,7 +246,7 @@ export default function App() {
                                     type="file"
                                     accept=".txt"
                                     onChange={(e) =>
-                                        e.target.files && handleFileUpload(key, e.target.files[0])
+                                        e.target.files && handleFileUpload(key, e.target.files[0]!)
                                     }
                                 />
                             </div>
