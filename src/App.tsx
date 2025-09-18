@@ -166,7 +166,7 @@ export default function App() {
         combined: "",
     });
     const [hideMatches, setHideMatches] = useState(false);
-    const [useCombined, setUseCombined] = useState(false);
+    const [useCombined, setUseCombined] = useState(true);
 
     const handleChange = (key: InputKey, value: string) => {
         setInputs((prev) => ({...prev, [key]: value}));
