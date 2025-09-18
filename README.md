@@ -1,69 +1,74 @@
-# React + TypeScript + Vite
+# Rclone Diff Viewer
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A small web app to visualize and explore differences between two directories based on rclone reports. Paste or upload rclone output and get interactive source/remote trees with color-coded statuses and quick counts.
 
-Currently, two official plugins are available:
+## What it does
+- Builds two trees (Source and Remote) from your inputs
+- Colors each file/folder by status:
+  - Identical: gray
+  - Differ: orange
+  - Additional (Source only): blue
+  - Additional (Remote only): blue
+- Lets you collapse/expand folders and optionally hide all matches to focus on differences
+- Shows totals for each status at a glance
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Accepted inputs
+You can provide either:
 
-## Expanding the ESLint configuration
+1) A combined report (single textarea)
+- Expected format is one entry per line: `<symbol><space><path>`
+- Symbols:
+  - `= ` identical
+  - `* ` differ
+  - `+ ` only in Source (i.e., missing in Destination)
+  - `- ` only in Remote (i.e., missing in Source)
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+Example combined report:
+```
+= docs/readme.md
+* src/App.tsx
++ only-in-source.txt
+- only-in-remote.txt
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+2) Separate lists (four textareas)
+- One path per line in each box:
+  - Identical (match)
+  - Differ
+  - Missing in Source (i.e., present only on Remote)
+  - Missing in Destination (i.e., present only on Source)
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+You can paste text or upload a simple .txt file for any box.
 
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+All parsing is done locally in your browser; no data leaves your machine.
+
+## Getting started (local dev)
+Prerequisites: Node.js 18+ recommended.
+
+Install dependencies and start the dev server:
+
+```bash
+npm install
+npm run dev
 ```
+
+Then open the printed local URL (Vite defaults to http://localhost:5173).
+
+## Build and preview
+Create a production build and preview it locally:
+
+```bash
+npm run build
+npm run preview
+```
+
+## Tech stack
+- React + TypeScript (Vite)
+- Tailwind CSS
+- shadcn/ui components
+- lucide-react icons
+
+## Notes
+- The combined format requires a leading symbol and a space before the path (e.g., `* src/file.tsx`).
+- “Additional (Source)” corresponds to entries present in Source but missing in Destination.
+- “Additional (Remote)” corresponds to entries present in Remote but missing in Source.
